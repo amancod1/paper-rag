@@ -64,12 +64,16 @@ class ArxivAPI:
     
 
 if __name__ == '__main__':
-    st = '2024-02-21'
+    st = '2024-02-29'
     start_date = datetime.strptime(st, '%Y-%m-%d').date()
     end_date = datetime.now().date()
-    categories = ['cs.AI', 'cs.CL', 'cs.LG', 'cs.CV']
+    categories = ['cs.AI']#, 'cs.CL', 'cs.LG', 'cs.CV']
 
     arxiv_api = ArxivAPI(start_date, end_date)
     papers = arxiv_api.get(categories)
     print(len(papers))
+    print(papers[0])
+    print(papers[0].entry_id)
+    print(papers[0].__dict__.keys())
+    papers[0].download_pdf(dirpath='/Users/ljm/Desktop/s3/', filename='new.pdf')
     

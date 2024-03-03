@@ -1,7 +1,7 @@
+import os
 import time
 import requests
 from datetime import datetime
-from fastapi import Depends
 from fastapi import APIRouter
 from fastapi import HTTPException
 
@@ -9,23 +9,23 @@ from danswer.server.papers.paper_api import ArxivAPI
 from danswer.server.documents.models import (
     ConnectorBase,
     CredentialBase,
-    ConnectorCredentialPairMetadata,
-    RunConnectorRequest,
-    ConnectorCredentialPairIdentifier,
-    ConnectorIndexingStatus,
     ConnectorSnapshot,
     CredentialSnapshot,
-    IndexAttemptSnapshot
+    RunConnectorRequest,
+    IndexAttemptSnapshot,
+    ConnectorIndexingStatus,
+    ConnectorCredentialPairMetadata,
+    ConnectorCredentialPairIdentifier,
 )
-from danswer.db.document import get_document_cnts_for_cc_pairs
 from danswer.db.engine import get_sqlalchemy_engine
-from danswer.db.connector import create_connector, get_connector_credential_ids
 from danswer.db.credentials import create_credential
-from danswer.db.connector_credential_pair import add_credential_to_connector, get_connector_credential_pairs
-from danswer.db.index_attempt import get_index_attempts_for_cc_pair, create_index_attempt, get_latest_index_attempts
+from danswer.db.document import get_document_cnts_for_cc_pairs
 from danswer.db.embedding_model import get_current_db_embedding_model
 from danswer.background.celery.celery_utils import get_deletion_status
 from danswer.db.deletion_attempt import check_deletion_attempt_is_allowed
+from danswer.db.connector import create_connector, get_connector_credential_ids
+from danswer.db.connector_credential_pair import add_credential_to_connector, get_connector_credential_pairs
+from danswer.db.index_attempt import get_index_attempts_for_cc_pair, create_index_attempt, get_latest_index_attempts
 from danswer.utils.logger import setup_logger
 
 from sqlalchemy.orm import Session
@@ -38,25 +38,23 @@ router = APIRouter(prefix="/paper")
 
 @router.get("/get_paper")
 def get_today_papers():
-    # return {'type': 'paper'}
-    # st = '2024-02-21'
-    # start_date = datetime.strptime(st, '%Y-%m-%d').date()
-    # end_date = datetime.now().date()
-    # categories = ['cs.AI', 'cs.CL', 'cs.LG', 'cs.CV']
-
-    # arxiv_api = ArxivAPI(start_date, end_date)
-    # papers = arxiv_api.get(categories)
-    # output = {i: {'title': paper.title} for i, paper in enumerate(papers)}
-    # return output
-    
-
+    # Get today papers
+    st = '2024-02-29'
+    start_date = datetime.strptime(st, '%Y-%m-%d').date()
+    end_date = datetime.now().date()
+    categories = ['cs.AI']#, 'cs.CL', 'cs.LG', 'cs.CV']
+    arxiv_api = ArxivAPI(start_date, end_date)
+    papers = arxiv_api.get(categories)
+    base_dir = '/app/s3'
+    filenames = [paper.entry_id.split('/')[-1] + '.pdf' for paper in papers]
+    file_paths = []
+    for i, paper in enumerate(papers[:10]):
+        paper.download_pdf(dirpath=base_dir, filename=filenames[i])
+        file_paths.append(os.path.join(base_dir, filenames[i]))
 
     # Upload files
-    file_path = ['/app/s3/cover_letter.pdf', '/app/s3/resume.pdf']
     api_url = 'http://localhost:8080/manage/admin/connector/file/upload'
-    # files = {'files': ('cover_letter.pdf', open(file_path, 'rb'))}
-    # files = {'files': tuple([open(p, 'rb') for p in file_path])}
-    files = {'files': (open(file_path[0], 'rb'))}
+    files = [("files", (open(p, "rb"))) for p in file_paths]
     response = requests.post(api_url, files=files)
     responseJson = response.json()
     if response.status_code == 200:
@@ -68,7 +66,7 @@ def get_today_papers():
     # Create connector
     connector_info = ConnectorBase(
         name = 'FileConnector' + f'{int(time.time() * 1000)}',
-        source = 'file',
+        source = 'file',    
         input_type = 'load_state',
         connector_specific_config = {'file_locations': responseJson['file_paths']},
         refresh_freq = None,
@@ -172,12 +170,6 @@ def get_today_papers():
         if credential_id not in skipped_credentials
     ]
     
-    print(index_attempt_ids)
-    print()
-    print()
-    print()
-    print()
-
     if not index_attempt_ids:
         raise HTTPException(
             status_code=400,
@@ -256,9 +248,4 @@ def get_today_papers():
             )
         )
 
-    print(indexing_statuses)
-    print()
-    print()
-    print()
-    print()
     return indexing_statuses

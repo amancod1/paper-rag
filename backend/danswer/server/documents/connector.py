@@ -337,12 +337,6 @@ def admin_google_drive_auth(
 def upload_files(
     files: list[UploadFile], _: User = Depends(current_admin_user)
 ) -> FileUploadResponse:
-    print(files)
-    print(_)
-    print()
-    print()
-    print()
-    print()
     for file in files:
         if not file.filename:
             raise HTTPException(status_code=400, detail="File name cannot be empty")
